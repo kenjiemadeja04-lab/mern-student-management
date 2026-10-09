@@ -12,7 +12,7 @@ function App() {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/students")
+      .get("https://mern-student-server.vercel.app/students")
       .then((response) => {
         setStudents(response.data);
       })
