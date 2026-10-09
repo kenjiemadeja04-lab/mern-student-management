@@ -10,14 +10,38 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-mongoose
-    .connect(process.env.MONGO_URI)
-    .then(() => {
-        console.log("Connected to MongoDB");
-    })
-    .catch((error) => {
-        console.log("MongoDB connection error:", error);
-    });
+let connectionPromise = null;
+
+// Wait for MongoDB before running student requests
+app.use("/students", async (req, res, next) => {
+    try {
+        if (mongoose.connection.readyState !== 1) {
+            if (!connectionPromise) {
+                connectionPromise = mongoose
+                    .connect(process.env.MONGO_URI, {
+                        serverSelectionTimeoutMS: 15000,
+                        family: 4
+                    })
+                    .then(() => {
+                        console.log("Connected to MongoDB");
+                    })
+                    .finally(() => {
+                        connectionPromise = null;
+                    });
+            }
+
+            await connectionPromise;
+        }
+
+        next();
+    } catch (error) {
+        console.error("MongoDB connection error:", error);
+
+        res.status(503).json({
+            message: "Database connection failed. Please try again."
+        });
+    }
+});
 
 app.get("/", (req, res) => {
     res.send("Server is running!");
@@ -30,6 +54,8 @@ app.get("/students", async (req, res) => {
 
         res.json(students);
     } catch (error) {
+        console.error("Retrieve students error:", error);
+
         res.status(500).json({
             message: "Failed to retrieve students."
         });
@@ -49,6 +75,8 @@ app.post("/students", async (req, res) => {
 
         res.status(201).json(student);
     } catch (error) {
+        console.error("Add student error:", error);
+
         res.status(400).json({
             message: "Failed to add student."
         });
@@ -76,6 +104,8 @@ app.put("/students/:id", async (req, res) => {
 
         res.json(student);
     } catch (error) {
+        console.error("Update student error:", error);
+
         res.status(400).json({
             message: "Failed to update student."
         });
@@ -99,6 +129,8 @@ app.delete("/students/:id", async (req, res) => {
             message: "Student deleted successfully."
         });
     } catch (error) {
+        console.error("Delete student error:", error);
+
         res.status(400).json({
             message: "Failed to delete student."
         });
